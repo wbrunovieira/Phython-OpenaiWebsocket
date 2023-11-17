@@ -18,9 +18,10 @@ def wait_on_run(run_id, thread_id):
     while run.status == "queued" or run.status == "in_progress":
         time.sleep(0.5)
         run = client.beta.threads.runs.retrieve(
-            thread_id=thread_id,
-            run_id=run_id,
-        )
+        thread_id=thread_id,
+        run_id=run_id,
+)
+
         time.sleep(0.5)
         print("Status atual  tentativa 2 do Run:", run.status)
     print("Status final do Run:", run.status)    
@@ -35,17 +36,24 @@ def process_run_response(run_id, thread_id):
     # Verifica se o run foi concluído com sucesso
     if run.status == 'completed':
         # Recupera a resposta do run
-        response = client.beta.threads.runs.retrieve(
-            thread_id=thread_id,
-            run_id=run_id
-        )
+        run = client.beta.threads.runs.retrieve(
+        thread_id=thread_id,
+        run_id=run_id,
+    )
+
+        messages = client.beta.threads.messages.list(thread_id=thread_id)
+
+    
+        print("messages     AQUI BRUNO", messages)
 
         # Processa a resposta (aqui você pode adicionar sua lógica específica)
         # Por exemplo, imprimindo a resposta
-        print("Resposta do Run:", response.model_dump_json())
+        for message in messages.data:
+            print(f"{message.role.title()}: {message.content[0].text.value}")
 
         # Retornar a resposta ou o processamento dela
-        return response
+        return messages
+        
     else:
         print("Run não foi concluído com sucesso.")
         return None
@@ -57,55 +65,42 @@ def main():
 
     # Definindo as funções fictícias no assistente
     assistant = client.beta.assistants.create(
-        name="Example Assistant",
-        instructions="You are an assistant. Answer questions using your knowledge base.",
-        model="gpt-3.5-turbo",
-        tools=[{
-            "type": "function",
-            "function": {
-                "name": "exampleFunction",
-                "description": "Example function description",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "param1": {"type": "string", "description": "Example parameter"}
-                    },
-                    "required": ["param1"]
-                }
-            }
-        }]
+        name="Math Tutor",
+        instructions="You are a personal math tutor. Write and run code to answer math questions.",
+        tools=[{"type": "code_interpreter"}],
+        model="gpt-3.5-turbo-1106"
     )
     
-    show_json(assistant)
+    
 
     thread = client.beta.threads.create()
-    show_json(thread)
+    
     
     # Enviando uma mensagem para iniciar a interação
     message = client.beta.threads.messages.create(
-        thread_id=thread.id,
-        role="user",
-        content="I need to solve the equation `3x + 11 = 14`. Can you help me?"
-    )
-    show_json(message)
+    thread_id=thread.id,
+    role="user",
+    content="I need to solve the equation `3x + 11 = 14`. Can you help me?"
+)
+    print("message     AQUI BRUNO", message)
 
-    message_content = ''.join([item.text.value for item in message.content if hasattr(item, 'text')])
+    #message_content = ''.join([item.text.value for item in message.content if hasattr(item, 'text')])
     # Criando o 'run'
     run = client.beta.threads.runs.create(
         thread_id=thread.id,
         assistant_id=assistant.id,
-        instructions=f"Answer the user's question: {message_content}"
+        instructions="Please address the user as Jane Doe. The user has a premium account."
 
     )
     
-    show_json(run)
+ 
+    wait_on_run(run.id, thread.id)
     
     process_run_response(run.id, thread.id)
 
     messages = client.beta.threads.messages.list(thread_id=thread.id)
-    show_json(messages)
+    print("messages     AQUI BRUNO", messages)
     
-    process_run_response(run.id, thread.id)
 
 
 if __name__ == "__main__":
